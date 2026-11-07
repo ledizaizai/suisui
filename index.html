@@ -321,9 +321,10 @@
 <div class="sheet" id="pwdSheet" hidden>
   <div class="pwdCard">
     <h3>这张碎图有口令</h3>
-    <p>输入发图人给你的 6 位数字</p>
+    <p>输入发图人给你的 8 位口令（字母+数字）</p>
     <p class="expireInfo" id="shardPwdExp" style="text-align:center">永久有效</p>
-    <input class="gateInput" id="shardPwd" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="off">
+    <input class="gateInput" id="shardPwd" inputmode="text" maxlength="10" placeholder="••••••••"
+      autocomplete="off" autocapitalize="characters" spellcheck="false" style="letter-spacing:.22em;font-size:21px">
     <div class="gateErr" id="pwdErr"></div>
     <div class="row">
       <button class="btn" id="pwdCancel">取消</button>
@@ -335,9 +336,9 @@
 <div class="sheet" id="adminSheet" hidden>
   <div class="pwdCard">
     <h3>每日口令</h3>
-    <p>今天朋友要输的 6 位数字</p>
+    <p>今天朋友要输的 6 位数字 · 0 点自动更换</p>
     <div class="pwdCode" id="adminToday">------</div>
-    <div class="codeList" id="adminList"></div>
+    <div class="codeList" id="adminList" hidden></div>
     <p class="mini">口令由页面按日期本地算出；懂技术的人看源码能推算，它挡的是随手转发，不是较真的人。</p>
     <div class="row">
       <button class="btn" id="adminClose">关闭</button>
@@ -1313,6 +1314,16 @@ async function decryptBytes(ct, meta, pwd){
   return new Uint8Array(pt);
 }
 
+// 碎图口令：8 位字母+数字，剔除 0/O/1/I/L 等易混字符
+const PWD_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+function makeShardPwd(){
+  const u = new Uint8Array(8);
+  (window.crypto || crypto).getRandomValues(u);
+  let out = '';
+  for(let i=0; i<8; i++) out += PWD_CHARS[u[i] % PWD_CHARS.length];
+  return out;
+}
+
 async function packShard(pngBlob, pwd, days){
   const file = state.srcFile;
   if(!file) return pngBlob;
@@ -1373,7 +1384,7 @@ function saveArt(){
     let hint = '长按图片存到相册 · 微信里也能长按保存';
     try {
       if(lock){
-        pwd = String(100000 + Math.floor(Math.random() * 900000));
+        pwd = makeShardPwd();
         packed = await packShard(blob, pwd, days);
         if(packed === blob){ pwd = ''; hint = '当前环境不支持加密，这张没有口令'; }
         else hint = '已加密 · 图片 + 口令一起发给朋友';
@@ -1596,16 +1607,9 @@ async function copyText(t, msg){
 }
 
 function openAdmin(){
-  const base = new Date();
-  const rows = [];
-  for(let i=0; i<8; i++){
-    const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i);
-    const k = dkey(d);
-    const label = i === 0 ? '今天' : (i === 1 ? '明天' : k.slice(5));
-    rows.push({ label, code: codeFor(k) });
-  }
-  $('#adminToday').textContent = rows[0].code;
-  $('#adminList').innerHTML = rows.map(r => '<div><span>' + r.label + '</span><b>' + r.code + '</b></div>').join('');
+  // 只显示今天，避免把未来几天的口令一次暴露
+  $('#adminToday').textContent = codeFor(dkey(new Date()));
+  $('#adminList').innerHTML = '';
   $('#adminSheet').hidden = false;
 }
 
@@ -1638,8 +1642,10 @@ function handleShardPack(pack){
 
 async function tryShardPwd(){
   if(!pendingPack) return;
-  const pwd = $('#shardPwd').value.trim();
-  if(!/^\d{6}$/.test(pwd)){ $('#pwdErr').textContent = '请输入 6 位数字'; return; }
+  const pwd = $('#shardPwd').value.trim().toUpperCase();
+  const isNew = /^[A-Z0-9]{8}$/.test(pwd);
+  const isOld = /^\d{6}$/.test(pwd);   // 兼容老碎图的 6 位纯数字口令
+  if(!isNew && !isOld){ $('#pwdErr').textContent = '请输入 8 位字母或数字（老碎图 6 位数字）'; return; }
   const metaB64 = (pendingPack.lock.split(':')[1]) || '';
   try{
     const meta = b64ToBytes(metaB64);
