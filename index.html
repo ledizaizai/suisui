@@ -158,7 +158,7 @@
   .pwdLabel{font-size:11.5px; color:var(--muted); letter-spacing:.08em; margin-top:4px}
   .pwdCode{font-size:32px; letter-spacing:.18em; font-weight:800; color:#ff5b34; margin:4px 0 2px;
     font-variant-numeric:tabular-nums}
-  .codeList{display:grid; grid-template-columns:1fr 1fr; gap:6px 8px; margin:10px 0; text-align:left;
+  .codeList{display:grid; grid-template-columns:1fr; gap:6px 8px; margin:10px 0; text-align:left;
     font-size:12px; color:#6f5f55}
   .codeList div{display:flex; justify-content:space-between; padding:6px 9px; background:#faf5ef; border-radius:9px}
   .codeList b{font-variant-numeric:tabular-nums; color:#241a16}
@@ -1607,9 +1607,18 @@ async function copyText(t, msg){
 }
 
 function openAdmin(){
-  // 只显示今天，避免把未来几天的口令一次暴露
-  $('#adminToday').textContent = codeFor(dkey(new Date()));
-  $('#adminList').innerHTML = '';
+  // 显示今、明、后天三天，不给更远的
+  const base = new Date();
+  const labels = ['今天', '明天', '后天'];
+  const rows = [];
+  for(let i=0; i<3; i++){
+    const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i);
+    rows.push({ label: labels[i], code: codeFor(dkey(d)) });
+  }
+  $('#adminToday').textContent = rows[0].code;
+  $('#adminList').hidden = false;
+  $('#adminList').innerHTML = rows.slice(1).map(r =>
+    '<div><span>' + r.label + '</span><b>' + r.code + '</b></div>').join('');
   $('#adminSheet').hidden = false;
 }
 
