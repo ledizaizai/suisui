@@ -117,6 +117,45 @@
   .sheet .btn{flex:1; background:rgba(255,255,255,.92); color:#2b1d16; border:0}
   .sheet .btn.primary{background:linear-gradient(135deg,#ff6a3d,#ff8f2e); color:#fff}
 
+  /* 口令门 */
+  .gate{position:fixed; inset:0; z-index:100; display:flex; align-items:center; justify-content:center; padding:26px;
+    background:radial-gradient(120% 60% at 50% 0%, #fff8ee 0%, #f5eadf 60%, #f1e5d9 100%)}
+  .gate[hidden]{display:none}
+  .gateCard{width:100%; max-width:320px; text-align:center}
+  .gateLogo{width:66px; height:66px; border-radius:22px; margin:0 auto 16px; display:grid; place-items:center;
+    background:linear-gradient(140deg,#ff6a3d,#ff9f1c); color:#fff; font-weight:800; font-size:27px;
+    box-shadow:0 14px 30px rgba(255,106,61,.35)}
+  .gateCard h2{margin:0 0 6px; font-size:19px; letter-spacing:.04em}
+  .gateCard p{margin:0 0 18px; font-size:12px; color:var(--muted); line-height:1.6}
+  .gateInput{width:100%; text-align:center; font-size:26px; letter-spacing:.35em; padding:14px 10px;
+    border-radius:16px; border:1.5px solid var(--line); background:#fff; font-family:inherit; color:var(--ink); outline:none}
+  .gateInput:focus{border-color:#ff9b70}
+  .gateCard .btn{width:100%; margin-top:12px}
+  .linkBtn{border:0; background:transparent; color:#a08d81; font:inherit; font-size:12px; margin-top:12px;
+    text-decoration:underline; text-underline-offset:3px}
+  .gateErr{color:#e0472b; font-size:12px; min-height:18px; margin-top:8px}
+  .switchRow{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:11px;
+    font-size:12.5px; color:#6f5f55}
+  .switchRow input{display:none}
+  .switchRow .sw{width:42px; height:24px; border-radius:99px; background:#eadfd4; position:relative; transition:.2s; flex:none}
+  .switchRow .sw:after{content:''; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%;
+    background:#fff; transition:.2s; box-shadow:0 1px 3px rgba(0,0,0,.2)}
+  .switchRow input:checked + .sw{background:#ff6a3d}
+  .switchRow input:checked + .sw:after{left:21px}
+  .pwdCard{background:#fff; border-radius:22px; padding:22px; width:min(340px,92%); text-align:center;
+    box-shadow:0 24px 50px rgba(0,0,0,.28)}
+  .pwdCard h3{margin:0 0 6px; font-size:17px}
+  .pwdCard p{margin:0 0 12px; font-size:12.5px; color:var(--muted); line-height:1.6}
+  .pwdCard .row{display:flex; gap:9px; margin-top:12px}
+  .pwdCard .btn{flex:1; font-size:13px; padding:11px}
+  .pwdLabel{font-size:11.5px; color:var(--muted); letter-spacing:.08em; margin-top:4px}
+  .pwdCode{font-size:32px; letter-spacing:.18em; font-weight:800; color:#ff5b34; margin:4px 0 2px;
+    font-variant-numeric:tabular-nums}
+  .codeList{display:grid; grid-template-columns:1fr 1fr; gap:6px 8px; margin:10px 0; text-align:left;
+    font-size:12px; color:#6f5f55}
+  .codeList div{display:flex; justify-content:space-between; padding:6px 9px; background:#faf5ef; border-radius:9px}
+  .codeList b{font-variant-numeric:tabular-nums; color:#241a16}
+  .mini{font-size:10.5px !important; color:#b3a296 !important; line-height:1.6; margin:6px 0 0 !important}
   .toast{position:fixed; left:50%; bottom:96px; transform:translate(-50%,10px); background:rgba(36,26,22,.92); color:#fff;
     font-size:12.5px; padding:10px 16px; border-radius:99px; opacity:0; pointer-events:none; transition:.25s; z-index:60;
     backdrop-filter:blur(8px); max-width:80vw; text-align:center}
@@ -125,6 +164,18 @@
 </style>
 </head>
 <body>
+<div class="gate" id="gate" hidden>
+  <div class="gateCard">
+    <div class="gateLogo">碎</div>
+    <h2 id="gateTitle">今日口令</h2>
+    <p id="gateSub">6 位数字 · 每天更换 · 找发链接的人要</p>
+    <input class="gateInput" id="gateInput" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="off">
+    <div class="gateErr" id="gateErr"></div>
+    <button class="btn primary" id="gateBtn">进入</button>
+    <button class="linkBtn" id="gateAdminBtn">我是管理员</button>
+    <button class="linkBtn" id="gateCancel" hidden>返回</button>
+  </div>
+</div>
 <div class="app">
   <header class="top">
     <div class="brand">
@@ -146,7 +197,11 @@
       </div>
 
       <div class="card panel">
-        <div class="chips" id="presets">
+        <div class="switchRow">
+          <span>复原时需要口令（加密保护原图）</span>
+          <input type="checkbox" id="lockShard" checked><span class="sw"></span>
+        </div>
+        <div class="chips" id="presets" style="margin-top:10px">
           <button class="chip on" data-preset="ref">像参考图</button>
           <button class="chip" data-preset="fine">更碎</button>
           <button class="chip" data-preset="coarse">更整</button>
@@ -160,7 +215,7 @@
         <button class="btn" id="againBtn">再碎一次</button>
         <button class="btn primary" id="saveBtn">保存图片</button>
       </div>
-      <p class="tip" id="tipBreak">白色缝隙就是“碎”的感觉 · 切到「拼回」可以上手拼</p>
+      <p class="tip" id="tipBreak">白色缝隙就是“碎”的感觉 · 切到「拼回」可以上手拼 · <button class="linkBtn" id="codesBtn" style="margin:0;font-size:10.5px">每日口令</button></p>
     </section>
 
     <section id="viewPuzzle" class="view" hidden>
@@ -231,11 +286,43 @@
 <div class="sheet" id="exportSheet" hidden>
   <img id="exportImg" alt="生成的碎图">
   <p id="exportHint">长按图片存到相册 · 微信里也能长按保存</p>
+  <div id="pwdBox" hidden>
+    <div class="pwdLabel">复原口令</div>
+    <div class="pwdCode" id="pwdCode">------</div>
+    <button class="linkBtn" id="copyPwd" style="margin-top:0">复制口令</button>
+  </div>
   <div class="row">
     <button class="btn" id="downloadBtn">下载 PNG</button>
     <button class="btn primary" id="closeSheet">好了</button>
   </div>
 </div>
+<div class="sheet" id="pwdSheet" hidden>
+  <div class="pwdCard">
+    <h3>这张碎图有口令</h3>
+    <p>输入发图人给你的 6 位数字</p>
+    <input class="gateInput" id="shardPwd" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="off">
+    <div class="gateErr" id="pwdErr"></div>
+    <div class="row">
+      <button class="btn" id="pwdCancel">取消</button>
+      <button class="btn primary" id="pwdOk">复原</button>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="adminSheet" hidden>
+  <div class="pwdCard">
+    <h3>每日口令</h3>
+    <p>今天朋友要输的 6 位数字</p>
+    <div class="pwdCode" id="adminToday">------</div>
+    <div class="codeList" id="adminList"></div>
+    <p class="mini">口令由页面按日期本地算出；懂技术的人看源码能推算，它挡的是随手转发，不是较真的人。</p>
+    <div class="row">
+      <button class="btn" id="adminClose">关闭</button>
+      <button class="btn primary" id="adminCopy">复制今天</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast" hidden></div>
 
 <script>
@@ -395,7 +482,7 @@ async function loadFile(file){
   // 选到的是碎图？直接走复原
   try{
     const pack = readShard(await file.arrayBuffer());
-    if(pack){ restoreFromBlob(new Blob([pack.data], { type: pack.mime })); return; }
+    if(pack){ handleShardPack(pack); return; }
   }catch(e){}
 
   const url = URL.createObjectURL(file);
@@ -1050,7 +1137,7 @@ async function importShard(file){
   try{
     const buf = await file.arrayBuffer();
     const pack = readShard(buf);
-    if(pack){ restoreFromBlob(new Blob([pack.data], { type: pack.mime })); return; }
+    if(pack){ handleShardPack(pack); return; }
 
     const img = new Image();
     img.onload = () => {
@@ -1074,8 +1161,10 @@ async function importShard(file){
 }
 
 /* ---------------- 保存：把未压缩的原图写进 PNG ---------------- */
-function exportSheet(blob, name, hint){
+function exportSheet(blob, name, hint, pwd){
   if(!blob){ toast('导出失败，换个浏览器试试'); return; }
+  $('#pwdBox').hidden = !pwd;
+  if(pwd) $('#pwdCode').textContent = pwd;
   const url = URL.createObjectURL(blob);
   const img = $('#exportImg');
   img.src = url;
@@ -1125,7 +1214,7 @@ function makeTextChunk(key, text){
 
 function readShard(buf){
   const dv = new DataView(buf), u8 = new Uint8Array(buf);
-  let off = 8, data = null, mime = '';
+  let off = 8, data = null, mime = '', lock = '';
   while(off + 12 <= u8.length){
     const len = dv.getUint32(off);
     if(off + 12 + len > u8.length) break;
@@ -1136,31 +1225,77 @@ function readShard(buf){
     } else if(type === 'tEXt'){
       const d = u8.subarray(off + 8, off + 8 + len);
       const z = d.indexOf(0);
-      if(z > 0 && String.fromCharCode.apply(null, d.subarray(0, z)) === 'shard-mime'){
-        mime = new TextDecoder().decode(d.subarray(z + 1));
-      }
+      const key = z > 0 ? String.fromCharCode.apply(null, d.subarray(0, z)) : '';
+      if(key === 'shard-mime') mime = new TextDecoder().decode(d.subarray(z + 1));
+      if(key === 'shard-lock') lock = new TextDecoder().decode(d.subarray(z + 1));
     }
     off += 12 + len;
   }
-  return data ? { data, mime: mime || 'image/jpeg' } : null;
+  return data ? { data, mime: mime || 'image/jpeg', lock } : null;
 }
 
-async function embedSource(pngBlob){
+function bytesToB64(u8){
+  let s = '';
+  const CH = 0x8000;
+  for(let i=0; i<u8.length; i+=CH) s += String.fromCharCode.apply(null, u8.subarray(i, i+CH));
+  return btoa(s);
+}
+function b64ToBytes(str){
+  const bin = atob(str);
+  const u = new Uint8Array(bin.length);
+  for(let i=0; i<bin.length; i++) u[i] = bin.charCodeAt(i);
+  return u;
+}
+
+async function encryptBytes(bytes, pwd){
+  if(!(window.crypto && window.crypto.subtle)) throw new Error('no-crypto');
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(pwd), 'PBKDF2', false, ['deriveKey']);
+  const key = await crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 120000, hash: 'SHA-256' },
+    km, { name: 'AES-GCM', length: 256 }, false, ['encrypt']);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, bytes));
+  const meta = new Uint8Array(28);
+  meta.set(salt, 0); meta.set(iv, 16);
+  return { ct, meta };
+}
+
+async function decryptBytes(ct, meta, pwd){
+  if(!(window.crypto && window.crypto.subtle)) throw new Error('no-crypto');
+  const salt = meta.subarray(0, 16), iv = meta.subarray(16, 28);
+  const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(pwd), 'PBKDF2', false, ['deriveKey']);
+  const key = await crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 120000, hash: 'SHA-256' },
+    km, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+  const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
+  return new Uint8Array(pt);
+}
+
+async function packShard(pngBlob, pwd){
   const file = state.srcFile;
   if(!file) return pngBlob;
   let bytes;
   try { bytes = new Uint8Array(await file.arrayBuffer()); } catch(e){ return pngBlob; }
-  if(bytes.length > 24 * 1024 * 1024) return pngBlob;   // 太大的文件不硬塞
+  if(bytes.length > 24 * 1024 * 1024) return pngBlob;
 
   const mime = file.type || 'image/jpeg';
-  const t = makeTextChunk('shard-mime', mime);
-  const c = makeChunk('shRd', bytes);
+  const parts = [makeTextChunk('shard-mime', mime)];
+  if(pwd){
+    const r = await encryptBytes(bytes, pwd);
+    parts.push(makeTextChunk('shard-lock', 'aesgcm:' + bytesToB64(r.meta)));
+    parts.push(makeChunk('shRd', r.ct));
+  } else {
+    parts.push(makeChunk('shRd', bytes));
+  }
   const src = new Uint8Array(await pngBlob.arrayBuffer());
-  const out = new Uint8Array(src.length + t.length + c.length);
+  let extra = 0;
+  for(const p of parts) extra += p.length;
+  const out = new Uint8Array(src.length + extra);
   out.set(src.subarray(0, 33), 0);
-  out.set(t, 33);
-  out.set(c, 33 + t.length);
-  out.set(src.subarray(33), 33 + t.length + c.length);
+  let off = 33;
+  for(const p of parts){ out.set(p, off); off += p.length; }
+  out.set(src.subarray(33), off);
   return new Blob([out], { type: 'image/png' });
 }
 
@@ -1183,17 +1318,28 @@ function savePuzzle(){
 
 function saveArt(){
   if(!state.src) return;
-  toast('正在把原图打包进去…');
+  const lock = $('#lockShard').checked;
+  toast(lock ? '正在加密并打包…' : '正在把原图打包进去…');
   artCv.toBlob(async blob => {
     if(!blob){ toast('导出失败，换个浏览器试试'); return; }
-    let packed = blob;
+    let packed = blob, pwd = '';
     let hint = '长按图片存到相册 · 微信里也能长按保存';
     try {
-      packed = await embedSource(blob);
-      const mb = (packed.size / 1048576).toFixed(1);
-      hint = '长按存相册 · 里面是未压缩的原图（' + mb + ' MB）· 微信发送请勾「原图」或走「文件」';
-    } catch(e){}
-    exportSheet(packed, '碎碎-' + Date.now() + '.png', hint);
+      if(lock){
+        pwd = String(100000 + Math.floor(Math.random() * 900000));
+        packed = await packShard(blob, pwd);
+        if(packed === blob){ pwd = ''; hint = '当前环境不支持加密，这张没有口令'; }
+        else hint = '已加密 · 图片 + 口令一起发给朋友';
+      } else {
+        packed = await packShard(blob, '');
+        const mb = (packed.size / 1048576).toFixed(1);
+        hint = '长按存相册 · 里面是未压缩原图（' + mb + ' MB）· 微信发送请勾「原图」';
+      }
+    } catch(e){
+      pwd = '';
+      hint = '长按图片存到相册 · 当前环境不支持加密';
+    }
+    exportSheet(packed, '碎碎-' + Date.now() + '.png', hint, pwd);
   }, 'image/png');
 }
 
@@ -1317,6 +1463,7 @@ $('#goBreak').onclick = () => {
 $('#closeSheet').onclick = () => {
   const s = $('#exportSheet');
   s.hidden = true;
+  $('#pwdBox').hidden = true;
   const u = s.dataset.url;
   if(u){ URL.revokeObjectURL(u); s.dataset.url = ''; }
 };
@@ -1324,6 +1471,147 @@ $('#closeSheet').onclick = () => {
 window.addEventListener('resize', () => {
   if(state.tab === 'puzzle') layoutPuzzle();
 });
+
+
+/* ---------------- 每日口令 / 管理员 / 碎图口令 ---------------- */
+const GATE_SECRET = 'suisui-4f8c2a91d7e3b650';
+const ADMIN_PW = '070923';
+const UNLOCK_KEY = 'suisui-unlock-v1';
+let gateMode = 'code';
+let pendingPack = null;
+
+function h32(str){
+  let h = 2166136261 >>> 0;
+  for(let i=0; i<str.length; i++){
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  h ^= h >>> 15; h = Math.imul(h, 2246822507) >>> 0;
+  h ^= h >>> 13; h = Math.imul(h, 3266489909) >>> 0;
+  h ^= h >>> 16;
+  return h >>> 0;
+}
+function dkey(d){
+  d = d || new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function codeFor(k){ return String(100000 + (h32(GATE_SECRET + '|' + k) % 900000)); }
+
+function gateShow(mode){
+  gateMode = mode || 'code';
+  $('#gate').hidden = false;
+  $('#gateTitle').textContent = gateMode === 'admin' ? '管理员密码' : '今日口令';
+  $('#gateSub').textContent = gateMode === 'admin'
+    ? '输入管理员密码，查看每天的口令'
+    : '6 位数字 · 每天更换 · 找发链接的人要';
+  $('#gateInput').value = '';
+  $('#gateInput').maxLength = gateMode === 'admin' ? 12 : 6;
+  $('#gateInput').placeholder = gateMode === 'admin' ? '管理员密码' : '••••••';
+  $('#gateErr').textContent = '';
+  $('#gateCancel').hidden = gateMode !== 'admin';
+  $('#gateAdminBtn').hidden = gateMode === 'admin';
+  setTimeout(() => { try{ $('#gateInput').focus(); }catch(e){} }, 80);
+}
+function unlockSite(){
+  try{ localStorage.setItem(UNLOCK_KEY, dkey(new Date())); }catch(e){}
+  $('#gate').hidden = true;
+}
+function gateSubmit(){
+  const v = $('#gateInput').value.trim();
+  if(gateMode === 'admin'){
+    if(v === ADMIN_PW){
+      $('#gate').hidden = true;
+      try{ sessionStorage.setItem('suisui-admin', '1'); }catch(e){}
+      openAdmin();
+    } else {
+      $('#gateErr').textContent = '管理员密码不对';
+    }
+    return;
+  }
+  if(v === codeFor(dkey(new Date()))) unlockSite();
+  else $('#gateErr').textContent = '口令不对';
+}
+
+async function copyText(t, msg){
+  try{
+    await navigator.clipboard.writeText(t);
+    toast(msg);
+  }catch(e){
+    const ta = document.createElement('textarea');
+    ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); toast(msg); }
+    catch(e2){ toast('复制失败，口令是 ' + t); }
+    ta.remove();
+  }
+}
+
+function openAdmin(){
+  const base = new Date();
+  const rows = [];
+  for(let i=0; i<8; i++){
+    const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i);
+    const k = dkey(d);
+    const label = i === 0 ? '今天' : (i === 1 ? '明天' : k.slice(5));
+    rows.push({ label, code: codeFor(k) });
+  }
+  $('#adminToday').textContent = rows[0].code;
+  $('#adminList').innerHTML = rows.map(r => '<div><span>' + r.label + '</span><b>' + r.code + '</b></div>').join('');
+  $('#adminSheet').hidden = false;
+}
+
+function handleShardPack(pack){
+  if(pack.lock){
+    pendingPack = pack;
+    $('#shardPwd').value = '';
+    $('#pwdErr').textContent = '';
+    $('#pwdSheet').hidden = false;
+    setTimeout(() => { try{ $('#shardPwd').focus(); }catch(e){} }, 80);
+    return;
+  }
+  restoreFromBlob(new Blob([pack.data], { type: pack.mime }));
+}
+
+async function tryShardPwd(){
+  if(!pendingPack) return;
+  const pwd = $('#shardPwd').value.trim();
+  if(!/^\d{6}$/.test(pwd)){ $('#pwdErr').textContent = '请输入 6 位数字'; return; }
+  const metaB64 = (pendingPack.lock.split(':')[1]) || '';
+  try{
+    const meta = b64ToBytes(metaB64);
+    const bytes = await decryptBytes(pendingPack.data, meta, pwd);
+    const mime = pendingPack.mime;
+    pendingPack = null;
+    $('#pwdSheet').hidden = true;
+    restoreFromBlob(new Blob([bytes], { type: mime }));
+  }catch(e){
+    $('#pwdErr').textContent = '口令不对';
+  }
+}
+
+$('#gateBtn').onclick = gateSubmit;
+$('#gateInput').addEventListener('keydown', e => { if(e.key === 'Enter') gateSubmit(); });
+$('#gateAdminBtn').onclick = () => gateShow('admin');
+$('#gateCancel').onclick = () => gateShow('code');
+
+$('#codesBtn').onclick = () => {
+  let isAdmin = false;
+  try{ isAdmin = sessionStorage.getItem('suisui-admin') === '1'; }catch(e){}
+  if(isAdmin) openAdmin(); else gateShow('admin');
+};
+$('#adminClose').onclick = () => { $('#adminSheet').hidden = true; };
+$('#adminCopy').onclick = () => copyText(codeFor(dkey(new Date())), '今日口令已复制');
+
+$('#pwdCancel').onclick = () => { pendingPack = null; $('#pwdSheet').hidden = true; };
+$('#pwdOk').onclick = tryShardPwd;
+$('#shardPwd').addEventListener('keydown', e => { if(e.key === 'Enter') tryShardPwd(); });
+$('#copyPwd').onclick = () => copyText($('#pwdCode').textContent, '口令已复制');
+
+(function gateInit(){
+  let ok = false;
+  try{ ok = localStorage.getItem(UNLOCK_KEY) === dkey(new Date()); }catch(e){}
+  if(!ok) gateShow('code');
+})();
 
 /* ---------------- 启动 ---------------- */
 function boot(){
