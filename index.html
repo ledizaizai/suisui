@@ -1476,7 +1476,6 @@ window.addEventListener('resize', () => {
 /* ---------------- 每日口令 / 管理员 / 碎图口令 ---------------- */
 const GATE_SECRET = 'suisui-4f8c2a91d7e3b650';
 const ADMIN_PW = '329070';
-const UNLOCK_KEY = 'suisui-unlock-v1';
 let gateMode = 'code';
 let pendingPack = null;
 
@@ -1513,7 +1512,9 @@ function gateShow(mode){
   setTimeout(() => { try{ $('#gateInput').focus(); }catch(e){} }, 80);
 }
 function unlockSite(){
-  try{ localStorage.setItem(UNLOCK_KEY, dkey(new Date())); }catch(e){}
+  // 不写任何本地存储：每次打开/刷新页面都要重新输口令；顺手清掉旧版本留下的记录
+  try{ localStorage.removeItem('suisui-unlock-v1'); }catch(e){}
+  try{ sessionStorage.removeItem('suisui-admin'); }catch(e){}
   $('#gate').hidden = true;
 }
 function gateSubmit(){
@@ -1521,7 +1522,6 @@ function gateSubmit(){
   if(gateMode === 'admin'){
     if(v === ADMIN_PW){
       $('#gate').hidden = true;
-      try{ sessionStorage.setItem('suisui-admin', '1'); }catch(e){}
       openAdmin();
     } else {
       $('#gateErr').textContent = '管理员密码不对';
@@ -1595,9 +1595,8 @@ $('#gateAdminBtn').onclick = () => gateShow('admin');
 $('#gateCancel').onclick = () => gateShow('code');
 
 $('#codesBtn').onclick = () => {
-  let isAdmin = false;
-  try{ isAdmin = sessionStorage.getItem('suisui-admin') === '1'; }catch(e){}
-  if(isAdmin) openAdmin(); else gateShow('admin');
+  // 不再用会话内缓存，每次看口令都要重新输管理员密码
+  gateShow('admin');
 };
 $('#adminClose').onclick = () => { $('#adminSheet').hidden = true; };
 $('#adminCopy').onclick = () => copyText(codeFor(dkey(new Date())), '今日口令已复制');
@@ -1608,9 +1607,9 @@ $('#shardPwd').addEventListener('keydown', e => { if(e.key === 'Enter') tryShard
 $('#copyPwd').onclick = () => copyText($('#pwdCode').textContent, '口令已复制');
 
 (function gateInit(){
-  let ok = false;
-  try{ ok = localStorage.getItem(UNLOCK_KEY) === dkey(new Date()); }catch(e){}
-  if(!ok) gateShow('code');
+  try{ localStorage.removeItem('suisui-unlock-v1'); }catch(e){}
+  try{ sessionStorage.removeItem('suisui-admin'); }catch(e){}
+  gateShow('code');
 })();
 
 /* ---------------- 启动 ---------------- */
