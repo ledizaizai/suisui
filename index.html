@@ -134,7 +134,7 @@
   .linkBtn{border:0; background:transparent; color:#a08d81; font:inherit; font-size:12px; margin-top:12px;
     text-decoration:underline; text-underline-offset:3px}
   .gateErr{color:#e0472b; font-size:12px; min-height:18px; margin-top:8px}
-  .switchRow{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:11px;
+  .switchRow{display:flex; cursor:pointer; align-items:center; justify-content:space-between; gap:10px; margin-top:11px;
     font-size:12.5px; color:#6f5f55}
   .switchRow input{display:none}
   .switchRow .sw{width:42px; height:24px; border-radius:99px; background:#eadfd4; position:relative; transition:.2s; flex:none}
@@ -197,10 +197,10 @@
       </div>
 
       <div class="card panel">
-        <div class="switchRow">
+        <label class="switchRow" for="lockShard">
           <span>复原时需要口令（加密保护原图）</span>
           <input type="checkbox" id="lockShard" checked><span class="sw"></span>
-        </div>
+        </label>
         <div class="chips" id="presets" style="margin-top:10px">
           <button class="chip on" data-preset="ref">像参考图</button>
           <button class="chip" data-preset="fine">更碎</button>
