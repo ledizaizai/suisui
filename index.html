@@ -1164,6 +1164,23 @@ async function embedSource(pngBlob){
   return new Blob([out], { type: 'image/png' });
 }
 
+function savePuzzle(){
+  if(!pz) return;
+  const b = pz.board;
+  const W = 1200, H = Math.round(W * b.h / b.w);
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H);
+  const k = W / b.w;
+  for(const p of pz.pieces){
+    if(!p.placed) continue;
+    g.drawImage(state.src, p.sx, p.sy, p.sw, p.sh,
+      (p.cx - p.w/2 - b.x)*k, (p.cy - p.h/2 - b.y)*k, p.w*k, p.h*k);
+  }
+  c.toBlob(blob => exportSheet(blob, '碎碎-拼图-' + Date.now() + '.png', '长按图片存到相册'), 'image/png');
+}
+
 function saveArt(){
   if(!state.src) return;
   toast('正在把原图打包进去…');
