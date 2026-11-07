@@ -142,6 +142,13 @@
     background:#fff; transition:.2s; box-shadow:0 1px 3px rgba(0,0,0,.2)}
   .switchRow input:checked + .sw{background:#ff6a3d}
   .switchRow input:checked + .sw:after{left:21px}
+  .expireBox{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:8px;
+    font-size:12.5px; color:#6f5f55}
+  .expireLabel{flex:none}
+  .expireSel{flex:1; max-width:190px; font:inherit; font-size:12.5px; color:#241a16; padding:7px 10px;
+    border-radius:11px; border:1.5px solid var(--line); background:#fff; outline:none;
+    -webkit-appearance:none; appearance:none; text-align:center}
+  .expireInfo{font-size:11px; color:#a08d81; margin:6px 0 0; line-height:1.6; text-align:left}
   .pwdCard{background:#fff; border-radius:22px; padding:22px; width:min(340px,92%); text-align:center;
     box-shadow:0 24px 50px rgba(0,0,0,.28)}
   .pwdCard h3{margin:0 0 6px; font-size:17px}
@@ -201,6 +208,20 @@
           <span>复原时需要口令（加密保护原图）</span>
           <input type="checkbox" id="lockShard" checked><span class="sw"></span>
         </label>
+        <div class="expireBox" id="expireBox">
+          <span class="expireLabel">碎图有效期</span>
+          <select id="expireSel" class="expireSel">
+            <option value="1">1 天</option>
+            <option value="3">3 天</option>
+            <option value="7" selected>7 天</option>
+            <option value="14">14 天</option>
+            <option value="28">28 天</option>
+            <option value="90">3 个月</option>
+            <option value="180">半年</option>
+            <option value="365">1 年</option>
+            <option value="0">永久</option>
+          </select>
+        </div>
         <div class="chips" id="presets" style="margin-top:10px">
           <button class="chip on" data-preset="ref">像参考图</button>
           <button class="chip" data-preset="fine">更碎</button>
@@ -289,6 +310,7 @@
   <div id="pwdBox" hidden>
     <div class="pwdLabel">复原口令</div>
     <div class="pwdCode" id="pwdCode">------</div>
+    <p class="expireInfo" id="pwdExpire">永久有效</p>
     <button class="linkBtn" id="copyPwd" style="margin-top:0">复制口令</button>
   </div>
   <div class="row">
@@ -300,6 +322,7 @@
   <div class="pwdCard">
     <h3>这张碎图有口令</h3>
     <p>输入发图人给你的 6 位数字</p>
+    <p class="expireInfo" id="shardPwdExp" style="text-align:center">永久有效</p>
     <input class="gateInput" id="shardPwd" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="off">
     <div class="gateErr" id="pwdErr"></div>
     <div class="row">
@@ -1161,10 +1184,27 @@ async function importShard(file){
 }
 
 /* ---------------- 保存：把未压缩的原图写进 PNG ---------------- */
-function exportSheet(blob, name, hint, pwd){
+function fmtDate(ts){
+  const d = new Date(ts);
+  const p = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+function expRangeText(exp){
+  if(!exp || exp === '0') return '永久有效';
+  const a = String(exp).split('.');
+  const from = Number(a[0]) || 0, to = Number(a[1]) || 0;
+  if(!from || !to) return '永久有效';
+  const days = Math.round((to - from) / 86400000);
+  return '有效期 ' + days + ' 天：' + fmtDate(from) + ' 起 → ' + fmtDate(to) + ' 止';
+}
+
+function exportSheet(blob, name, hint, pwd, exp){
   if(!blob){ toast('导出失败，换个浏览器试试'); return; }
   $('#pwdBox').hidden = !pwd;
-  if(pwd) $('#pwdCode').textContent = pwd;
+  if(pwd){
+    $('#pwdCode').textContent = pwd;
+    $('#pwdExpire').textContent = expRangeText(exp);
+  }
   const url = URL.createObjectURL(blob);
   const img = $('#exportImg');
   img.src = url;
@@ -1214,7 +1254,7 @@ function makeTextChunk(key, text){
 
 function readShard(buf){
   const dv = new DataView(buf), u8 = new Uint8Array(buf);
-  let off = 8, data = null, mime = '', lock = '';
+  let off = 8, data = null, mime = '', lock = '', exp = '';
   while(off + 12 <= u8.length){
     const len = dv.getUint32(off);
     if(off + 12 + len > u8.length) break;
@@ -1228,10 +1268,11 @@ function readShard(buf){
       const key = z > 0 ? String.fromCharCode.apply(null, d.subarray(0, z)) : '';
       if(key === 'shard-mime') mime = new TextDecoder().decode(d.subarray(z + 1));
       if(key === 'shard-lock') lock = new TextDecoder().decode(d.subarray(z + 1));
+      if(key === 'shard-exp') exp = new TextDecoder().decode(d.subarray(z + 1));
     }
     off += 12 + len;
   }
-  return data ? { data, mime: mime || 'image/jpeg', lock } : null;
+  return data ? { data, mime: mime || 'image/jpeg', lock, exp } : null;
 }
 
 function bytesToB64(u8){
@@ -1272,7 +1313,7 @@ async function decryptBytes(ct, meta, pwd){
   return new Uint8Array(pt);
 }
 
-async function packShard(pngBlob, pwd){
+async function packShard(pngBlob, pwd, days){
   const file = state.srcFile;
   if(!file) return pngBlob;
   let bytes;
@@ -1281,6 +1322,11 @@ async function packShard(pngBlob, pwd){
 
   const mime = file.type || 'image/jpeg';
   const parts = [makeTextChunk('shard-mime', mime)];
+  // 有效期：0 = 永久；否则写 起始时间戳.截止时间戳
+  const now = Date.now();
+  const ttl = Number(days) || 0;
+  const expStr = ttl > 0 ? (now + '.' + (now + ttl * 86400000)) : '0';
+  parts.push(makeTextChunk('shard-exp', expStr));
   if(pwd){
     const r = await encryptBytes(bytes, pwd);
     parts.push(makeTextChunk('shard-lock', 'aesgcm:' + bytesToB64(r.meta)));
@@ -1319,6 +1365,7 @@ function savePuzzle(){
 function saveArt(){
   if(!state.src) return;
   const lock = $('#lockShard').checked;
+  const days = Number($('#expireSel').value) || 0;
   toast(lock ? '正在加密并打包…' : '正在把原图打包进去…');
   artCv.toBlob(async blob => {
     if(!blob){ toast('导出失败，换个浏览器试试'); return; }
@@ -1327,11 +1374,11 @@ function saveArt(){
     try {
       if(lock){
         pwd = String(100000 + Math.floor(Math.random() * 900000));
-        packed = await packShard(blob, pwd);
+        packed = await packShard(blob, pwd, days);
         if(packed === blob){ pwd = ''; hint = '当前环境不支持加密，这张没有口令'; }
         else hint = '已加密 · 图片 + 口令一起发给朋友';
       } else {
-        packed = await packShard(blob, '');
+        packed = await packShard(blob, '', days);
         const mb = (packed.size / 1048576).toFixed(1);
         hint = '长按存相册 · 里面是未压缩原图（' + mb + ' MB）· 微信发送请勾「原图」';
       }
@@ -1339,7 +1386,9 @@ function saveArt(){
       pwd = '';
       hint = '长按图片存到相册 · 当前环境不支持加密';
     }
-    exportSheet(packed, '碎碎-' + Date.now() + '.png', hint, pwd);
+    const now = Date.now();
+    const expStr = (lock && days > 0) ? (now + '.' + (now + days * 86400000)) : '0';
+    exportSheet(packed, '碎碎-' + Date.now() + '.png', hint, pwd, expStr);
   }, 'image/png');
 }
 
@@ -1560,11 +1609,26 @@ function openAdmin(){
   $('#adminSheet').hidden = false;
 }
 
+function shardExpired(exp){
+  if(!exp || exp === '0') return false;
+  const parts = String(exp).split('.');
+  const to = Number(parts[1]) || 0;
+  if(!to) return false;
+  return Date.now() > to;
+}
+
 function handleShardPack(pack){
+  if(shardExpired(pack.exp)){
+    const parts = String(pack.exp).split('.');
+    const to = Number(parts[1]) || 0;
+    toast('这张碎图已于 ' + fmtDate(to) + ' 过期，无法复原');
+    return;
+  }
   if(pack.lock){
     pendingPack = pack;
     $('#shardPwd').value = '';
     $('#pwdErr').textContent = '';
+    $('#shardPwdExp').textContent = expRangeText(pack.exp);
     $('#pwdSheet').hidden = false;
     setTimeout(() => { try{ $('#shardPwd').focus(); }catch(e){} }, 80);
     return;
@@ -1581,6 +1645,13 @@ async function tryShardPwd(){
     const meta = b64ToBytes(metaB64);
     const bytes = await decryptBytes(pendingPack.data, meta, pwd);
     const mime = pendingPack.mime;
+    if(shardExpired(pendingPack.exp)){
+      const pp = String(pendingPack.exp).split('.');
+      pendingPack = null;
+      $('#pwdSheet').hidden = true;
+      toast('这张碎图已于 ' + fmtDate(Number(pp[1]) || 0) + ' 过期，无法复原');
+      return;
+    }
     pendingPack = null;
     $('#pwdSheet').hidden = true;
     restoreFromBlob(new Blob([bytes], { type: mime }));
@@ -1605,6 +1676,18 @@ $('#pwdCancel').onclick = () => { pendingPack = null; $('#pwdSheet').hidden = tr
 $('#pwdOk').onclick = tryShardPwd;
 $('#shardPwd').addEventListener('keydown', e => { if(e.key === 'Enter') tryShardPwd(); });
 $('#copyPwd').onclick = () => copyText($('#pwdCode').textContent, '口令已复制');
+
+(function expireInit(){
+  const sw = $('#lockShard'), box = $('#expireBox'), sel = $('#expireSel');
+  const sync = () => {
+    box.style.opacity = sw.checked ? '1' : '.4';
+    box.style.pointerEvents = sw.checked ? 'auto' : 'none';
+  };
+  sw.addEventListener('change', sync);
+  sync();
+})();
+
+try{ Object.assign(window, { __suisui:{ state, saveArt, packShard, readShard, expRangeText, shardExpired, handleShardPack, exportSheet } }); }catch(e){}
 
 (function gateInit(){
   try{ localStorage.removeItem('suisui-unlock-v1'); }catch(e){}
