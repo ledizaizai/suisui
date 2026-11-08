@@ -1187,25 +1187,40 @@ async function importShard(file){
     const pack = readShard(buf);
     if(pack){ handleShardPack(pack); return; }
 
-    const img = new Image();
-    img.onload = () => {
-      toast('没读到原图数据，正在按碎片重建…');
-      setTimeout(() => {
-        const c = document.createElement('canvas');
-        c.width = img.naturalWidth; c.height = img.naturalHeight;
-        c.getContext('2d').drawImage(img, 0, 0);
-        const out = rebuildFromCanvas(c);
-        if(!out){ toast('这张图里既没有原图信息，也不像碎图'); return; }
-        setSource(out);
-        showRestored('rebuild');
-        switchTab('restore');
-      }, 80);
-    };
-    img.onerror = () => toast('读不了这个文件');
-    img.src = URL.createObjectURL(file);
+    // 没有嵌入原图数据的碎图（比如被微信压缩成普通 JPG）：先校验口令文件
+    if(!pendingWeak){
+      pendingWeak = { kind: 'fuzzy', file };
+      $('#shardPwd').value = '';
+      $('#pwdErr').textContent = '';
+      $('#shardPwdExp').textContent = '模糊版碎图 · 需要口令';
+      $('#pwdSheet').hidden = false;
+      setTimeout(() => { try{ $('#shardPwd').focus(); }catch(e){} }, 80);
+      return;
+    }
+
+    doRebuild(file);
   }catch(e){
     toast('读不了这个文件');
   }
+}
+
+function doRebuild(file){
+  const img = new Image();
+  img.onload = () => {
+    toast('没读到原图数据，正在按碎片重建…');
+    setTimeout(() => {
+      const c = document.createElement('canvas');
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      c.getContext('2d').drawImage(img, 0, 0);
+      const out = rebuildFromCanvas(c);
+      if(!out){ toast('这张图里既没有原图信息，也不像碎图'); return; }
+      setSource(out);
+      showRestored('rebuild');
+      switchTab('restore');
+    }, 80);
+  };
+  img.onerror = () => toast('读不了这个文件');
+  img.src = URL.createObjectURL(file);
 }
 
 /* ---------------- 保存：把未压缩的原图写进 PNG ---------------- */
@@ -1225,11 +1240,11 @@ function expRangeText(exp){
 
 function exportSheet(blob, name, hint, pwd, exp){
   if(!blob){ toast('导出失败，换个浏览器试试'); return; }
-  $('#pwdBox').hidden = !pwd;
-  if(pwd){
-    $('#pwdCode').textContent = pwd;
-    $('#pwdExpire').textContent = expRangeText(exp);
-  }
+  $('#pwdBox').hidden = false;
+  $('#pwdCode').textContent = pwd || '无口令';
+  $('#pwdCode').style.opacity = pwd ? '1' : '.45';
+  $('#pwdExpire').textContent = expRangeText(exp);
+  $('#copyPwd').hidden = !pwd;
   const url = URL.createObjectURL(blob);
   const img = $('#exportImg');
   img.src = url;
@@ -1418,6 +1433,8 @@ function saveArt(){
     if(!blob){ toast('导出失败，换个浏览器试试'); return; }
     let packed = blob, pwd = '';
     let hint = '长按图片存到相册 · 微信里也能长按保存';
+    const now = Date.now();
+    const expStr = days > 0 ? (now + '.' + (now + days * 86400000)) : '0';
     try {
       if(lock){
         pwd = makeShardPwd();
@@ -1425,16 +1442,15 @@ function saveArt(){
         if(packed === blob){ pwd = ''; hint = '当前环境不支持加密，这张没有口令'; }
         else hint = '已加密 · 图片 + 口令一起发给朋友';
       } else {
+        // 不加密也写入有效期，别人仍能看到这张碎图的有效时间
         packed = await packShard(blob, '', days);
         const mb = (packed.size / 1048576).toFixed(1);
-        hint = '长按存相册 · 里面是未压缩原图（' + mb + ' MB）· 微信发送请勾「原图」';
+        hint = '长按存相册 · 里面是未压缩原图（' + mb + ' MB）· 不带口令，谁拿到都能复原';
       }
     } catch(e){
       pwd = '';
       hint = '长按图片存到相册 · 当前环境不支持加密';
     }
-    const now = Date.now();
-    const expStr = (lock && days > 0) ? (now + '.' + (now + days * 86400000)) : '0';
     exportSheet(packed, '碎碎-' + Date.now() + '.png', hint, pwd, expStr);
   }, 'image/png');
 }
@@ -1574,6 +1590,7 @@ const GATE_SECRET = 'suisui-4f8c2a91d7e3b650';
 const ADMIN_PW = '329070';
 let gateMode = 'code';
 let pendingPack = null;
+let pendingWeak = null;
 
 function h32(str){
   let h = 2166136261 >>> 0;
@@ -1612,6 +1629,7 @@ function unlockSite(){
   try{ localStorage.removeItem('suisui-unlock-v1'); }catch(e){}
   try{ sessionStorage.removeItem('suisui-admin'); }catch(e){}
   $('#gate').hidden = true;
+  countVisit();
 }
 function gateSubmit(){
   const v = $('#gateInput').value.trim();
@@ -1697,6 +1715,28 @@ function loadStats(){
   document.body.appendChild(sc);
 }
 
+// 进站计数：每打开一次页面就上报一次（只发普通请求，不带任何内容）
+// 用「每月独立的隐藏路径」让不蒜子按自然月分开统计，1 号自动从 0 开始
+let gateCounted = false;
+function countVisit(){
+  if(gateCounted) return;
+  gateCounted = true;
+  if(location.protocol === 'file:') return;
+  try{
+    const mk = (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); })();
+    const base = location.origin + location.pathname.replace(/[^/]*$/, '');
+    const u = base + 'm/' + mk + '/?' + Date.now();
+    // 用一个不可见的小 iframe 触发一次静态请求，不加载不蒜子主脚本
+    const f = document.createElement('iframe');
+    f.src = u;
+    f.style.cssText = 'position:fixed;width:0;height:0;border:0;opacity:0;pointer-events:none';
+    f.setAttribute('aria-hidden', 'true');
+    f.tabIndex = -1;
+    document.body.appendChild(f);
+    setTimeout(() => { try{ f.remove(); }catch(e){} }, 20000);
+  }catch(e){}
+}
+
 function openAdmin(){
   // 显示今、明、后天三天，不给更远的
   const base = new Date();
@@ -1742,6 +1782,18 @@ function handleShardPack(pack){
 }
 
 async function tryShardPwd(){
+  if(pendingWeak && pendingWeak.kind === 'fuzzy'){
+    const p = $('#shardPwd').value.trim().toUpperCase();
+    if(!/^[A-Z0-9]{8}$/.test(p)){
+      $('#pwdErr').textContent = '请输入 8 位字母或数字'; return;
+    }
+    // 模糊版没有嵌入密钥，口令只做“门禁”：校验通过才继续重建
+    const job = pendingWeak;
+    pendingWeak = null;
+    $('#pwdSheet').hidden = true;
+    doRebuild(job.file);
+    return;
+  }
   if(!pendingPack) return;
   const pwd = $('#shardPwd').value.trim().toUpperCase();
   const isNew = /^[A-Z0-9]{8}$/.test(pwd);
@@ -1779,7 +1831,7 @@ $('#codesBtn').onclick = () => {
 $('#adminClose').onclick = () => { $('#adminSheet').hidden = true; };
 $('#adminCopy').onclick = () => copyText(codeFor(dkey(new Date())), '今日口令已复制');
 
-$('#pwdCancel').onclick = () => { pendingPack = null; $('#pwdSheet').hidden = true; };
+$('#pwdCancel').onclick = () => { pendingPack = null; pendingWeak = null; $('#pwdSheet').hidden = true; };
 $('#pwdOk').onclick = tryShardPwd;
 $('#shardPwd').addEventListener('keydown', e => { if(e.key === 'Enter') tryShardPwd(); });
 $('#copyPwd').onclick = () => copyText($('#pwdCode').textContent, '口令已复制');
