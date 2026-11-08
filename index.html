@@ -669,7 +669,8 @@ function buildArt(animate){
     const k = Math.min(1, EX_MAX / Math.max(W, H));
     artCv.width = Math.max(1, Math.round(W * k));
     artCv.height = Math.max(1, Math.round(H * k));
-    artCv._scale = k;           // 绘制时按此比例缩放
+    artCv._scale = k;           // drawArt 用它换算 cell/坐标
+    artCv._srcW = W; artCv._srcH = H;
   }
   artCtx.imageSmoothingEnabled = false;
 
@@ -1413,6 +1414,25 @@ function getExpireDays(){
   return Number(v) || 0;
 }
 
+// 把当前碎图画面单独画成一张长边 1500 的 PNG（只有画面，不含原图数据），
+// 用来当「封面」— 这样文件体积很小，但嵌进去的原图仍是原尺寸。
+const COVER_MAX = 1500;
+function makeCoverPng(){
+  // artCv 已经是长边 ≤1500 的画面；小图保持原样不放大
+  const srcW = artCv._srcW || artCv.width, srcH = artCv._srcH || artCv.height;
+  const k = Math.min(1, COVER_MAX / Math.max(srcW, srcH));
+  const W = Math.max(1, Math.round(srcW * k));
+  const H = Math.max(1, Math.round(srcH * k));
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  g.imageSmoothingEnabled = (W !== artCv.width);
+  g.fillStyle = state.params.bg;
+  g.fillRect(0, 0, W, H);
+  g.drawImage(artCv, 0, 0, W, H);
+  return c;
+}
+
 // 碎图口令：8 位字母+数字，剔除 0/O/1/I/L 等易混字符
 const PWD_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 function makeShardPwd(){
@@ -1477,7 +1497,8 @@ function saveArt(){
   const lock = $('#lockShard').checked;
   const days = getExpireDays();
   toast(lock ? '正在加密并打包…' : '正在把原图打包进去…');
-  artCv.toBlob(async blob => {
+  const cover = makeCoverPng();
+  cover.toBlob(async blob => {
     if(!blob){ toast('导出失败，换个浏览器试试'); return; }
     let packed = blob, pwd = '';
     let hint = '长按图片存到相册 · 微信里也能长按保存';
@@ -1499,7 +1520,9 @@ function saveArt(){
       pwd = '';
       hint = '长按图片存到相册 · 当前环境不支持加密';
     }
-    exportSheet(packed, '碎碎-' + Date.now() + '.png', hint, pwd, expStr);
+    const full = state.srcFullSize || { w: state.src.width, h: state.src.height };
+    const real = '碎图 ' + cover.width + '×' + cover.height + ' · 原图 ' + full.w + '×' + full.h;
+    exportSheet(packed, '碎碎-' + Date.now() + '.png', real + '\n' + hint, pwd, expStr);
   }, 'image/png');
 }
 
