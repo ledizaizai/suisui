@@ -168,6 +168,15 @@
     font-size:12px; color:#6f5f55}
   .codeList div{display:flex; justify-content:space-between; padding:6px 9px; background:#faf5ef; border-radius:9px}
   .codeList b{font-variant-numeric:tabular-nums; color:#241a16}
+  .howCard{background:#fff; border-radius:22px; padding:24px 22px; width:min(360px,92%);
+    box-shadow:0 24px 50px rgba(0,0,0,.28); text-align:left; max-height:82vh; overflow:auto}
+  .howCard h3{margin:0 0 16px; font-size:17px; text-align:center}
+  .howBlock{margin-bottom:18px}
+  .howTag{display:inline-block; font-size:11.5px; letter-spacing:.1em; color:#fff; background:#ff6a3d;
+    border-radius:99px; padding:3px 12px; margin-bottom:8px}
+  .howSteps{margin:0; padding-left:20px; font-size:13px; line-height:2; color:#4a3b33}
+  .howSteps li::marker{color:#ff9b70; font-weight:700}
+  .howCard .row{margin-top:6px}
   .statBox{margin:12px 0 4px; text-align:left; border-top:1px solid #f0e6dc; padding-top:10px}
   .statRow{display:flex; align-items:center; justify-content:space-between; font-size:12.5px;
     color:#6f5f55; padding:4px 0}
@@ -253,7 +262,7 @@
         <button class="btn" id="againBtn">再碎一次</button>
         <button class="btn primary" id="saveBtn">保存图片</button>
       </div>
-      <p class="tip" id="tipBreak">白色缝隙就是“碎”的感觉 · 切到「拼回」可以上手拼 · <button class="linkBtn" id="codesBtn" style="margin:0;font-size:10.5px">每日口令</button></p>
+      <p class="tip" id="tipBreak">白色缝隙就是“碎”的感觉 · 切到「拼回」可以上手拼 · <button class="linkBtn" id="codesBtn" style="margin:0;font-size:10.5px">每日口令</button> · <button class="linkBtn" id="howBtn" style="margin:0;font-size:10.5px">怎么用</button></p>
     </section>
 
     <section id="viewPuzzle" class="view" hidden>
@@ -288,6 +297,7 @@
         <h2>把碎图放回来</h2>
         <p>选一张碎图：带原图的直接精确复原，被压缩过的会按碎片重建</p>
         <button class="btn primary" id="pickShard">选择碎图</button>
+        <button class="linkBtn" id="howBtn2" style="margin-top:10px">怎么用？看说明</button>
       </div>
       <div class="restored" id="restoredBox" hidden>
         <div class="resultCard">
@@ -367,6 +377,36 @@
     <div class="row">
       <button class="btn" id="adminClose">关闭</button>
       <button class="btn primary" id="adminCopy">复制今天</button>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="howSheet" hidden>
+  <div class="howCard">
+    <h3>怎么用</h3>
+
+    <div class="howBlock">
+      <div class="howTag">原图</div>
+      <ol class="howSteps">
+        <li>先碎图</li>
+        <li>点保存，存下这张碎图</li>
+        <li>微信发原图给朋友</li>
+        <li>对方下载原图</li>
+        <li>打开这个网页，选碎图，输口令，原图就解开了</li>
+      </ol>
+    </div>
+
+    <div class="howBlock">
+      <div class="howTag">模糊图</div>
+      <ol class="howSteps">
+        <li>直接截图</li>
+        <li>微信发原图</li>
+        <li>对方下载后选图，按碎片重建</li>
+      </ol>
+    </div>
+
+    <div class="row">
+      <button class="btn primary" id="howClose">知道了</button>
     </div>
   </div>
 </div>
@@ -1829,6 +1869,9 @@ $('#codesBtn').onclick = () => {
   gateShow('admin');
 };
 $('#adminClose').onclick = () => { $('#adminSheet').hidden = true; };
+$('#howBtn').onclick = () => { $('#howSheet').hidden = false; };
+$('#howBtn2').onclick = () => { $('#howSheet').hidden = false; };
+$('#howClose').onclick = () => { $('#howSheet').hidden = true; };
 $('#adminCopy').onclick = () => copyText(codeFor(dkey(new Date())), '今日口令已复制');
 
 $('#pwdCancel').onclick = () => { pendingPack = null; pendingWeak = null; $('#pwdSheet').hidden = true; };
