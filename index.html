@@ -663,7 +663,14 @@ function buildArt(animate){
   artCell = cell;
   artGap = clamp(p.gap * W / 1000, 0, cell*0.55);
 
-  artCv.width = W; artCv.height = H;
+  // 导出画布长边限制到 1.5K，避免碎图文件过大
+  {
+    const EX_MAX = 1500;
+    const k = Math.min(1, EX_MAX / Math.max(W, H));
+    artCv.width = Math.max(1, Math.round(W * k));
+    artCv.height = Math.max(1, Math.round(H * k));
+    artCv._scale = k;           // 绘制时按此比例缩放
+  }
   artCtx.imageSmoothingEnabled = false;
 
   const info = $('#artInfo');
@@ -682,11 +689,12 @@ function buildArt(animate){
 
 function drawArt(t){
   const W = artCv.width, H = artCv.height;
+  const k = artCv._scale || 1;
   artCtx.setTransform(1,0,0,1,0,0);
   artCtx.fillStyle = state.params.bg;
   artCtx.fillRect(0,0,W,H);
   artCtx.imageSmoothingEnabled = false;
-  const cell = artCell, gap = artGap * t;
+  const cell = artCell * k, gap = artGap * t;
   for(let i=0;i<artPieces.length;i++){
     const p = artPieces[i];
     const gl = p.il * gap, gt = p.it * gap, gr = p.ir * gap, gb = p.ib * gap;
@@ -1896,7 +1904,6 @@ $('#copyPwd').onclick = () => copyText($('#pwdCode').textContent, '口令已复�
   sync();
 })();
 
-try{ Object.assign(window, { __suisui:{ state, saveArt, packShard, readShard, expRangeText, shardExpired, handleShardPack, exportSheet } }); }catch(e){}
 
 (function gateInit(){
   try{ localStorage.removeItem('suisui-unlock-v1'); }catch(e){}
