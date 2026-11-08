@@ -348,9 +348,9 @@
 <div class="sheet" id="pwdSheet" hidden>
   <div class="pwdCard">
     <h3>这张碎图有口令</h3>
-    <p>输入发图人给你的 8 位口令（字母+数字）</p>
+    <p>输入发图人给你的 8 位口令</p>
     <p class="expireInfo" id="shardPwdExp" style="text-align:center">永久有效</p>
-    <input class="gateInput" id="shardPwd" inputmode="text" maxlength="10" placeholder="••••••••"
+    <input class="gateInput" id="shardPwd" inputmode="text" maxlength="8" placeholder="••••••••"
       autocomplete="off" autocapitalize="characters" spellcheck="false" style="letter-spacing:.22em;font-size:21px">
     <div class="gateErr" id="pwdErr"></div>
     <div class="row">
@@ -1433,13 +1433,47 @@ function makeCoverPng(){
   return c;
 }
 
+const TARGET_BYTES = 1024 * 1024;   // 碎图整体 ≈1MB
+
+async function blobOf(canvas, q){
+  return new Promise(res => canvas.toBlob(b => res(b), 'image/webp', q));
+}
+
+// 把封面压到不超过 target 字节；先降画质，再缩分辨率
+async function fitUnder(blob, target, cover){
+  if(!blob || blob.size <= target) return { blob };
+  let canvas = document.createElement('canvas');
+  canvas.width = cover.width; canvas.height = cover.height;
+  canvas.getContext('2d').drawImage(cover, 0, 0);
+  let q = 0.86, tries = 0;
+  while(tries < 10){
+    const b = await blobOf(canvas, q);
+    if(b && b.size <= target) return { blob: b };
+    tries++;
+    if(q > 0.55){ q -= 0.1; }
+    else {
+      // 画质压到底还大，就缩尺寸
+      const sc = Math.sqrt(target / (b ? b.size : blob.size)) * 0.95;
+      const w = Math.max(200, Math.round(canvas.width * sc));
+      const h = Math.max(200, Math.round(canvas.height * sc));
+      const c2 = document.createElement('canvas');
+      c2.width = w; c2.height = h;
+      c2.getContext('2d').drawImage(canvas, 0, 0, w, h);
+      canvas = c2; q = 0.8;
+    }
+  }
+  const b = await blobOf(canvas, 0.7);
+  return { blob: b };
+}
+
 // 碎图口令：8 位字母+数字，剔除 0/O/1/I/L 等易混字符
 const PWD_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-function makeShardPwd(){
-  const u = new Uint8Array(8);
+function makeShardPwd(len){
+  len = len || 8;
+  const u = new Uint8Array(len);
   (window.crypto || crypto).getRandomValues(u);
   let out = '';
-  for(let i=0; i<8; i++) out += PWD_CHARS[u[i] % PWD_CHARS.length];
+  for(let i=0; i<len; i++) out += PWD_CHARS[u[i] % PWD_CHARS.length];
   return out;
 }
 
@@ -1505,8 +1539,11 @@ function saveArt(){
     const now = Date.now();
     const expStr = days > 0 ? (now + '.' + (now + days * 86400000)) : '0';
     try {
+      // 整体压到 1MB 左右：先画质 0.86，超了就降，再不行就缩分辨率
+      const lim = await fitUnder(blob, TARGET_BYTES, cover);
+      if(lim.blob) blob = lim.blob;
       if(lock){
-        pwd = makeShardPwd();
+        pwd = makeShardPwd(8);
         packed = await packShard(blob, pwd, days);
         if(packed === blob){ pwd = ''; hint = '当前环境不支持加密，这张没有口令'; }
         else hint = '已加密 · 图片 + 口令一起发给朋友';
@@ -1855,7 +1892,7 @@ function handleShardPack(pack){
 async function tryShardPwd(){
   if(pendingWeak && pendingWeak.kind === 'fuzzy'){
     const p = $('#shardPwd').value.trim().toUpperCase();
-    if(!/^[A-Z0-9]{8}$/.test(p)){
+    if(!/^[A-Z0-9]{8}$/.test(p) && !/^\d{6}$/.test(p)){
       $('#pwdErr').textContent = '请输入 8 位字母或数字'; return;
     }
     // 模糊版没有嵌入密钥，口令只做“门禁”：校验通过才继续重建
