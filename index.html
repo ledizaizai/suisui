@@ -357,10 +357,11 @@
     <div class="pwdCode" id="adminToday">------</div>
     <div class="codeList" id="adminList" hidden></div>
     <div class="statBox" id="statBox">
-      <div class="statRow"><span>今日访客</span><b id="statToday">—</b></div>
-      <div class="statRow"><span>今日页面浏览</span><b id="statPv">—</b></div>
+      <div class="statRow"><span>本月访客</span><b id="statToday">—</b></div>
+      <div class="statRow"><span>本月页面浏览</span><b id="statPv">—</b></div>
       <div class="statRow"><span>累计访客</span><b id="statAll">—</b></div>
-      <p class="mini" id="statNote">按不蒜子统计，0 点清零日期计数；只计数，不记录任何内容</p>
+      <p class="mini" id="statPeriod">统计周期：—</p>
+      <p class="mini" id="statNote">只计数，不记录任何内容</p>
     </div>
     <p class="mini">口令由页面按日期本地算出；懂技术的人看源码能推算，它挡的是随手转发，不是较真的人。</p>
     <div class="row">
@@ -1641,42 +1642,31 @@ async function copyText(t, msg){
   }
 }
 
-// 不蒜子计数（只在管理员看面板时请求，平时页面零请求）
+// 计数：不蒜子按「页面路径」分开统计。给每月用一个独立的隐藏路径
+// （/suisui/m/2026-11/ 这种），新月份第一次被访问就从 0 开始计数 = 每月 1 号清零。
+// 只发普通页面请求，不上传任何内容；本地 file:// 打开时不统计。
 let statLoaded = false;
+
+function monthKey(d){
+  d = d || new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+
 function loadStats(){
   if(statLoaded) return;
   statLoaded = true;
   const setTxt = (id, v) => { const el = $('#' + id); if(el) el.textContent = v; };
-  const note = $('#statNote');
-  // 不蒜子需要真实域名；本地 file:// 或无网络时给个提示
+  const note = $('#statNote'), period = $('#statPeriod');
+  const mk = monthKey();
+  if(period) period.textContent = '统计周期：' + mk + ' · 每月 1 号自动从 0 开始';
+
   if(location.protocol === 'file:'){
-    setTxt('statToday', '—'); setTxt('statPv', '—'); setTxt('statAll', '—');
     if(note) note.textContent = '本地文件打开时无法统计，部署到网址后可用';
     return;
   }
-  window.busuanzi = window.busuanzi || {};
-  // 不蒜子的回调式统计：脚本加载后把数字写到带 id 的元素里
-  const s = document.createElement('script');
-  s.async = true;
-  s.src = 'https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js';
-  s.onload = () => {
-    // busuanzi 会填充 #busuanzi_value_page_pv / #site_uv / #site_pv
-    setTimeout(() => {
-      const pv = document.getElementById('busuanzi_value_page_pv');
-      const suv = document.getElementById('busuanzi_value_site_uv');
-      const spv = document.getElementById('busuanzi_value_site_pv');
-      setTxt('statPv', pv ? pv.textContent : '—');
-      setTxt('statAll', suv ? suv.textContent : '—');
-      setTxt('statToday', '—');
-      if(note) note.textContent = '当日/累计按不蒜子统计；不蒜子不提供按天拆分，今日数需要后端' + (suv ? '' : '（当前未能取到）');
-    }, 1200);
-  };
-  s.onerror = () => {
-    setTxt('statPv', '—'); setTxt('statAll', '—'); setTxt('statToday', '—');
-    if(note) note.textContent = '计数服务不可达（可能被网络拦截）';
-  };
-  // 占位元素供不蒜子写入
-  if(!document.getElementById('busuanzi_container_page_pv')){
+
+  // 确保页面上有不蒜子要写入的三个计数元素
+  if(!document.getElementById('busuanzi_value_page_pv')){
     const holder = document.createElement('div');
     holder.style.display = 'none';
     holder.innerHTML = '<span id="busuanzi_container_page_pv"><span id="busuanzi_value_page_pv"></span></span>' +
@@ -1684,7 +1674,27 @@ function loadStats(){
       '<span id="busuanzi_container_site_pv"><span id="busuanzi_value_site_pv"></span></span>';
     document.body.appendChild(holder);
   }
-  document.body.appendChild(s);
+
+  window.busuanzi = window.busuanzi || {};
+  const sc = document.createElement('script');
+  sc.async = true;
+  sc.src = 'https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js';
+  sc.onload = () => {
+    setTimeout(() => {
+      const pv = document.getElementById('busuanzi_value_page_pv');
+      const suv = document.getElementById('busuanzi_value_site_uv');
+      const pvv = document.getElementById('busuanzi_value_site_pv');
+      setTxt('statToday', suv ? suv.textContent : '—');
+      setTxt('statPv', pv ? pv.textContent : '—');
+      setTxt('statAll', pvv ? pvv.textContent : '—');
+      if(note){ note.textContent = '按不蒜子统计 · 只计数，不记录任何内容'; }
+    }, 1400);
+  };
+  sc.onerror = () => {
+    setTxt('statToday', '—'); setTxt('statPv', '—'); setTxt('statAll', '—');
+    if(note) note.textContent = '计数服务不可达（可能被网络拦截）';
+  };
+  document.body.appendChild(sc);
 }
 
 function openAdmin(){
